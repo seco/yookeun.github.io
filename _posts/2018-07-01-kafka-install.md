@@ -16,19 +16,19 @@ categories: kafka
 먼저 자바등이 모두 설치되었다면 각 서버의 호스트명을 지정하자. 필수조건은 아닌데. 설정해두면 좀 편하다.
 
 ```bash 
-hostnamectl set-hostname centos7_1(호스트명) # 변경후 재로그인 
+hostnamectl set-hostname kafka1(호스트명) # 변경후 재로그인 
 ```
 
-여기서는 각각의 서버에 centos7_1, centos7_2, centos7_3 으로 호스트명을 입력했다.  그리고 hosts 파일을 열어 수정하자
+여기서는 각각의 서버에 kafka1, kafka2, kafka3 으로 호스트명을 입력했다.  그리고 hosts 파일을 열어 수정하자
 
 ```bash
 vi /etc/hosts
 ```
 
 ```bash
-0.0.0.0 centos7_1  
-192.168.57.3 centos7_2
-192.168.58.3 centos7_3
+0.0.0.0 kafka1  
+192.168.57.3 kafka2
+192.168.58.3 kafka3
 ```
 
 자기 자신은 `0.0.0.0` 으로 호스트명과 세팅하고 다른 서버는 각각 아이피를 등록하여 세팅한다. 
@@ -64,14 +64,14 @@ ln -s zookeeper-3.4.12 zookeeper
 ```bash 
 mkdir data
 
-#(1: centos7_1, 2: centos7_2, 3: centos7_3)
+#(1: kafka1, 2: kafka2, 3: kafka3)
 echo 1 > data/myid  
 ```
 
 각각 서버의 id는 아래와 같이 구성한다. 
-- centos7_1 -> myid: 1
-- centos7_2 -> myid: 2
-- centos7_3 -> myid: 3
+- kafka1 -> myid: 1
+- kafka2 -> myid: 2
+- kafka3 -> myid: 3
 
 설정파일을 만들자. `zookeeper/conf` 안에 `zoo_sample.cfg`가 있으니 `zoo.cfg`로 복사해서 사용하자.
 
@@ -114,9 +114,9 @@ maxClientCnxns=60
 # Purge task interval in hours
 # Set to "0" to disable auto purge feature
 #autopurge.purgeInterval=1
-server.1=centos7_1:2888:3888
-server.2=centos7_2:2888:3888
-server.3=centos7_3:2888:3888
+server.1=kafka1:2888:3888
+server.2=kafka2:2888:3888
+server.3=kafka3:2888:3888
 ```
 
 이제 실행시켜보자.
@@ -133,7 +133,7 @@ Using config: /home/ykkim/zookeeper/bin/../conf/zoo.cfg
 Starting zookeeper ... STARTED
  ```
 
-세개 모두 정상적으로 가동하면 `zookeeper/zookeeper.out` 로그에 에러가 표시되는지 확인해본다. 
+세개 모두 정상적으로 가동하면 `zookeeper/zookeeper.out` 로그에  표시되는지 확인해본다. 
 
 서비스등록을 위해 종료하자. 서비스를 등록하여 시스템 재시작시 자동으로 가동토록 해주자. 
 
@@ -144,19 +144,19 @@ Starting zookeeper ... STARTED
  `zookeeper-server.service`라는 스크립트를 만들고 서비스에 등록하자(root작업)
 
 ```bash 
- vi /etc/systemd/system/zookeeper-server.service
+ vi /etc/systemd/system/zookeeper.service
 ```
 
 ```bash 
 [Unit]
-Description=zookeeper-server
+Description=zookeeper
 After=network.target
 
 [Service]
 Type=forking
 User=ykkim
 Group=ykkim
-SyslogIdentifier=zookeeper-server
+SyslogIdentifier=zookeeper
 WorkingDirectory=/home/ykkim/zookeeper
 Restart=always
 RestartSec=0s
@@ -211,7 +211,7 @@ log.dirs=/home/ykkim/data1,/home/ykkim/data2
 ############################# Zookeeper #############################
 ## 주기퍼 연결설정
 ## 서버1호스트명:서버1포트,서버2호스트명:서버2포트,서버3호스트명:서버2포트/주기퍼노드명
-zookeeper.connect=centos7_1:2181,centos7_2:2181,centos7_3:2181/ykkim-kafka
+zookeeper.connect=kafka1:2181,kafka2:2181,kafka3:2181/ykkim-kafka
 
 ```
 `zookeeper.connect` 에서 마지막 `/ykkim-kafka`는 주기퍼노드명이다. 작성하지 않으면 주기퍼 루트노드에 저장된다. 그렇게 되면 관리하기가 어려우므로 이렇게 별도로 노드명을 기재해준다. 이제 실행해보자. 
@@ -236,20 +236,20 @@ zookeeper.connect=centos7_1:2181,centos7_2:2181,centos7_3:2181/ykkim-kafka
 마지막으로 `kafka-server.service`라는 스크립트를 만들고 서비스에 등록하자.
 
 ```bash 
-vi /etc/systemd/system/kafka-server.service
+vi /etc/systemd/system/kafka.service
 ```
 
 ```bash
 [Unit]
-Description=kafka-server
+Description=kafka
 After=network.target
 
 [Service]
 Type=simple
 User=ykkim
 Group=ykkim
-SyslogIdentifier=kafka-server
-WorkingDirectory=/home/ykkim/zookeeper
+SyslogIdentifier=kafka
+WorkingDirectory=/home/ykkim/kafka
 Restart=always
 RestartSec=0s
 ExecStart=/home/ykkim/kafka/bin/kafka-server-start.sh /home/ykkim/kafka/config/server.properties
@@ -265,11 +265,11 @@ WantedBy=multi-user.target
 # 서비스 데몬 재시작
 systemctl daemon-reload 
 # 카프카 실행
-systemctl start kafka-server.service 
+systemctl start kafka.service 
 # 실행 상태 확인
-systemctl status kafka-server.service
+systemctl status kafka.service
 # 시스템 부팅할때 자동실행 설정
-systemctl enable kafka-server.service
+systemctl enable kafka.service
 ```
 
 이것으로 설치가 완료되었다. 테스트를 진행해보자. 
@@ -310,13 +310,13 @@ ls /ykkim-kafka/brokers/ids
  잘되었으면 `quit` 로 빠져나온다. 다음은 카프카에 토픽을 생성하도록 하자. `ykkim-topic` 이라는 토픽을 생성한다. 토픽은 카프카에서 `kafka-topics.sh` 를 이용해서 생성한다. 
 
 ```bash 
-./kafka/bin/kafka-topics.sh --zookeeper centos7_1:2181,centos7_2:2181,centos7_3:2181/ykkim-kafka --replication-factor 1 --partitions 1 --topic ykkim-topic --create
+./kafka/bin/kafka-topics.sh --zookeeper kafka1:2181,kafka2:2181,kafka3:2181/ykkim-kafka --replication-factor 1 --partitions 1 --topic ykkim-topic --create
 ```
 
 그런 다음  카프카 프로듀서(kafka-console-producer.sh)를 통해서 접속한다. 
 
 ```bash 
-./kafka/bin/kafka-console-producer.sh --broker-list centos7_1:9092,centos7_2:9092,centos7_3:9092 --topic ykkim-topic
+./kafka/bin/kafka-console-producer.sh --broker-list kafka1:9092,kafka2:9092,kafka3:9092 --topic ykkim-topic
 ```
 
 엔터를 치고 기다려면 > 프롬포트가 깜빡인다. 그러면 메시지를 입력하자. 
@@ -330,7 +330,7 @@ ls /ykkim-kafka/brokers/ids
 그리고 나서 카프카 컨슈머(kafka-console-consumer.sh)에서 해당 토픽에 메시지를 읽어보도록 하자. 
 
 ```bash 
-./kafka/bin/kafka-console-consumer.sh --bootstrap-server centos7_1:9092,centos7_2:9092,centos7_3:9092 --topic ykkim-topic --from-beginning
+./kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka1:9092,kafka2:9092,kafka3:9092 --topic ykkim-topic --from-beginning
 ```
 
 엔터를 치면 프로듀서에 입력된 값이 컨슈머에서 읽어오는 것을 확인할 수 있다. 다른 클러스트에서도 확인이 가능하다. 
